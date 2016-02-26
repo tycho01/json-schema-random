@@ -8,14 +8,11 @@ This is an choppy piece of software, that is in need of some care and affection.
 
 # TODO
 
-* format
 * uniqueItems
-* $ref
-* patternProperties
+* $ref -- solvable with [json-schema-ref-parser](https://github.com/BigstickCarpet/json-schema-ref-parser) but turns the result into a Promise
 * dependencies
 * allOf
 * anyOf
-* oneOf
 * not
 
 # Install

@@ -1,5 +1,6 @@
 random = require 'otw/like/_/random'
 type = require 'otw/like/_/type'
+tv4 = require 'tv4'
 randexp = do () ->
   _randexp = require 'randexp'
   (pattern) -> new _randexp(pattern).gen()
@@ -9,12 +10,17 @@ module.exports = exports = (schema, options = {}) ->
   options.root_schema = schema
 
   generator = new exports.Generator options
-  return generator.generate()
+  return generator.gen_val()
 
 class exports.Generator
 
   constructor: (options) ->
     @options = options
+
+  gen_val: (schema = null, depth = 0) ->
+    data = @generate(schema, depth)
+    console.log tv4.errors unless tv4.validate(data, schema)
+    return data
 
   generate: (schema = null, depth = 0) ->
 
@@ -83,13 +89,42 @@ class exports.Generator
 
   # type = string
   string: (schema, depth = 0) ->
-    return randexp schema.pattern  if schema.pattern
-    # FIXME format should not be ignored
+    return randexp schema.pattern if schema.pattern
+    return @formattedString schema, depth if schema.format
     randomOptions =
       minLength: schema.minLength
       maxLength: schema.maxLength
     @random 'string', randomOptions
 
+  # https://github.com/jonahkagan/schematic-ipsum/blob/master/src/schema.coffee
+  formattedString: (schema, depth = 0) ->
+    suffix = -> _.randomFrom ["com", "org", "net", "edu", "xxx"]
+    switch schema.format
+      when "date-time"
+        return (new Date(_.randomInt 0, Date.now())).toISOString()
+      #when "date"
+      #when "time"
+      #when "regex"
+      when "color"
+        # http://paulirish.com/2009/random-hex-color-code-snippets/
+        return "#" + _.randomInt(0, 16777215).toString(16)
+      #when "style"
+      when "phone"
+        return "(#{_.randomInt 0, 999}) #{_.randomInt 0, 999} #{_.randomInt 0, 9999}"
+      when "uri"
+        gen.word (err1, word1) ->
+          gen.word (err2, word2) ->
+            done (err1 or err2), "http://#{word1}.#{word2}.#{suffix()}"
+      when "email"
+        gen.name (err, name) ->
+          gen.word (err2, word) ->
+            name = name.toLowerCase().replace(/\s/g, "_")
+            done (err or err2), "#{name}@#{word}.#{suffix()}"
+      when "ip-address"
+        return "#{_.randomInt 0, 255}.#{_.randomInt 0, 255}.#{_.randomInt 0, 255}.#{_.randomInt 0, 255}"
+      #when "ipv6"
+      #when "host-name"
+      else return "String format #{schema.format} not supported"
 
   # type = array
   array: (schema, depth = 0) ->
@@ -141,6 +176,14 @@ class exports.Generator
       # FIXME
       # continue  if random 'boolean'
       o[key] = @generate prop, depth + 1
+
+    for key, prop of schema.patternProperties
+      randomOptions =
+        minimum: 0
+        maximum: 2
+      howManyMoreProperties = @random 'integer', randomOptions
+      for i in [0..howManyMoreProperties]
+        o[randexp key] = @generate prop, depth+1
 
     if type(schema.additionalProperties) is 'object'
       # break  if schema.additionalProperties.$ref?[0] is '#'
